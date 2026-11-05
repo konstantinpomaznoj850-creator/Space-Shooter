@@ -456,76 +456,81 @@ async def main():
     global achievement_popup, popup_timer
     global coins, unlocked_ships, equipped_ship, upgrade_levels, lang, gfx_high
 
-    click_handled = False
+    is_dragging = False
 
     while True:
         current_time = pygame.time.get_ticks()
         mx, my = pygame.mouse.get_pos()
-        is_pressing = pygame.mouse.get_pressed()[0]
 
-        if state == "PLAY":
-            if is_pressing:
-                px = max(player.width//2, min(mx, WIDTH - player.width//2))
-                py = max(ZONE_Y + player.height//2, min(my, HEIGHT - player.height//2))
-                player.center = (px, py)
-                
-            if tutorial_active:
-                if is_pressing and not click_handled:
-                    click_handled = True
-                    tutorial_step += 1
-                    tutorial_step_time = pygame.time.get_ticks()
-                    if tutorial_step >= 4:
-                        tutorial_active = False
-                        tutorial_done = True
-                        last_enemy_spawn = pygame.time.get_ticks() - enemy_spawn_delay
-                        last_shot_time = pygame.time.get_ticks()
-                        save_data()
-                elif not is_pressing:
-                    click_handled = False
+        # Плавное движение корабля (если палец/мышь зажат)
+        if state == "PLAY" and is_dragging:
+            px = max(player.width//2, min(mx, WIDTH - player.width//2))
+            py = max(ZONE_Y + player.height//2, min(my, HEIGHT - player.height//2))
+            player.center = (px, py)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 save_data(); pygame.quit(); sys.exit()
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                dist_to_bomb = math.hypot(event.pos[0] - bomb_center[0], event.pos[1] - bomb_center[1])
+            # Обработка нажатий (мышь или палец)
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+                is_dragging = True
+                
+                if event.type == pygame.FINGERDOWN:
+                    click_x, click_y = int(event.x * WIDTH), int(event.y * HEIGHT)
+                else:
+                    click_x, click_y = event.pos
+                    
+                # === ОБУЧЕНИЕ ===
+                if state == "PLAY" and tutorial_active:
+                    tutorial_step += 1
+                    tutorial_step_time = pygame.time.get_ticks()
+                    if tutorial_step >= 4:
+                        tutorial_active = False
+                        tutorial_done = True
+                        last_enemy_spawn = pygame.time.get_ticks() - enemy_spawn_delay # Спавним врага сразу
+                        last_shot_time = pygame.time.get_ticks()
+                        save_data()
+                    continue # Пропускаем нажатия на кнопки под обучением
+
+                dist_to_bomb = math.hypot(click_x - bomb_center[0], click_y - bomb_center[1])
 
                 if state == "MENU":
-                    if btn_play.collidepoint(event.pos):
+                    if btn_play.collidepoint(click_x, click_y):
                         reset_game(); state = "PLAY"
-                    elif btn_shop.collidepoint(event.pos):
+                    elif btn_shop.collidepoint(click_x, click_y):
                         prev_state = "MENU"; state = "SHOP"
-                    elif btn_achieve.collidepoint(event.pos):
+                    elif btn_achieve.collidepoint(click_x, click_y):
                         state = "ACHIEVE"
-                    elif btn_settings.collidepoint(event.pos):
+                    elif btn_settings.collidepoint(click_x, click_y):
                         settings_prev_state = "MENU"
                         state = "SETTINGS"
-                    elif btn_exit.collidepoint(event.pos):
+                    elif btn_exit.collidepoint(click_x, click_y):
                         save_data(); pygame.quit(); sys.exit()
 
                 elif state == "ACHIEVE":
-                    if btn_achieve_back.collidepoint(event.pos):
+                    if btn_achieve_back.collidepoint(click_x, click_y):
                         state = "MENU"
 
                 elif state == "SETTINGS":
-                    if btn_lang.collidepoint(event.pos):
+                    if btn_lang.collidepoint(click_x, click_y):
                         lang = "EN" if lang == "RU" else "RU"
-                    elif btn_gfx.collidepoint(event.pos):
+                    elif btn_gfx.collidepoint(click_x, click_y):
                         gfx_high = not gfx_high
-                    elif btn_settings_back.collidepoint(event.pos):
+                    elif btn_settings_back.collidepoint(click_x, click_y):
                         save_data(); state = settings_prev_state
 
                 elif state == "PAUSE":
-                    if btn_resume.collidepoint(event.pos):
+                    if btn_resume.collidepoint(click_x, click_y):
                         current_time = pygame.time.get_ticks()
                         adjust_timers_after_pause(current_time - pause_time)
                         state = "PLAY"
-                    elif btn_shop_pause.collidepoint(event.pos):
+                    elif btn_shop_pause.collidepoint(click_x, click_y):
                         prev_state = "PAUSE"; state = "SHOP"
-                    elif btn_settings_pause.collidepoint(event.pos):
+                    elif btn_settings_pause.collidepoint(click_x, click_y):
                         settings_prev_state = "PAUSE"
                         state = "SETTINGS"
-                    elif btn_exit_pause.collidepoint(event.pos):
+                    elif btn_exit_pause.collidepoint(click_x, click_y):
                         coins += run_coins
                         check_achievements()
                         save_data()
@@ -533,9 +538,9 @@ async def main():
 
                 elif state == "SHOP":
                     if pending_purchase:
-                        if btn_popup_cancel.collidepoint(event.pos):
+                        if btn_popup_cancel.collidepoint(click_x, click_y):
                             pending_purchase = None
-                        elif btn_popup_buy.collidepoint(event.pos):
+                        elif btn_popup_buy.collidepoint(click_x, click_y):
                             cost = pending_purchase["cost"]
                             if coins >= cost:
                                 coins -= cost
@@ -552,15 +557,15 @@ async def main():
                             else:
                                 play_sound(snd_hit)
                     else:
-                        if btn_shop_back.collidepoint(event.pos):
+                        if btn_shop_back.collidepoint(click_x, click_y):
                             save_data(); state = prev_state
-                        elif btn_tab_ships.collidepoint(event.pos):
+                        elif btn_tab_ships.collidepoint(click_x, click_y):
                             shop_tab = "SHIPS"
-                        elif btn_tab_upgrades.collidepoint(event.pos):
+                        elif btn_tab_upgrades.collidepoint(click_x, click_y):
                             shop_tab = "UPGRADES"
                         else:
                             for i, btn in enumerate(shop_btns):
-                                if btn.collidepoint(event.pos):
+                                if btn.collidepoint(click_x, click_y):
                                     if shop_tab == "SHIPS" and i < len(SHIPS):
                                         if i in unlocked_ships:
                                             equipped_ship = i
@@ -574,12 +579,12 @@ async def main():
                                             pending_purchase = {"type": "upg", "index": i, "cost": cost}
 
                 elif state == "GAMEOVER":
-                    if btn_menu_gameover.collidepoint(event.pos):
+                    if btn_menu_gameover.collidepoint(click_x, click_y):
                         state = "MENU"
 
                 elif state == "PLAY":
                     if not tutorial_active:
-                        if btn_pause.collidepoint(event.pos):
+                        if btn_pause.collidepoint(click_x, click_y):
                             state = "PAUSE"
                             pause_time = pygame.time.get_ticks()
                         elif dist_to_bomb < bomb_radius and bombs > 0:
@@ -591,6 +596,9 @@ async def main():
                                     powerups.append([pygame.Rect(e[0].centerx - 10, e[0].centery, 20, 20), "coin", 1])
                             enemies.clear(); enemy_bullets.clear()
                             if boss: boss["hp"] -= 50
+
+            if event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
+                is_dragging = False
 
         screen.fill(BLACK)
 
@@ -1197,7 +1205,6 @@ async def main():
             draw_text(t("menu"), font, WHITE, btn_menu_gameover.centerx, btn_menu_gameover.centery)
 
         pygame.display.flip()
-        # В Pygbag это критически важно для работы без зависаний:
         await asyncio.sleep(1 / 60)
 
 if __name__ == "__main__":
