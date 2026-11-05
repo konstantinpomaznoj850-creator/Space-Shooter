@@ -28,8 +28,6 @@ snd_coin    = load_sound("coin.wav")
 snd_powerup = load_sound("powerup.wav")
 snd_hit     = load_sound("hit.wav")
 
-# В браузере (Emscripten) экран нельзя делать FULLSCREEN через (0, 0). 
-# Pygbag сам отмасштабирует окно, если задать стандартный размер.
 if sys.platform == "emscripten":
     screen = pygame.display.set_mode((800, 600))
 else:
@@ -214,9 +212,8 @@ ACHIEVEMENTS_LIST = [
     {"id": "a6", "cond": lambda: stats["coins_earned"] >= 1000, "claimed": False}
 ]
 
-# === ИСПРАВЛЕНИЕ ПУТИ СОХРАНЕНИЯ ДЛЯ БРАУЗЕРА И ANDROID ===
 if sys.platform == "emscripten":
-    SAVE_FILE = "shooter_save.txt"  # В браузере сохраняет в Local Storage
+    SAVE_FILE = "shooter_save.txt"
 elif hasattr(sys, 'getandroidapilevel'):
     SAVE_DIR = os.getenv('ANDROID_PRIVATE', os.path.expanduser('~'))
     SAVE_FILE = os.path.join(SAVE_DIR, "shooter_save.txt")
@@ -460,6 +457,9 @@ async def main():
     global achievement_popup, popup_timer
     global coins, unlocked_ships, equipped_ship, upgrade_levels, lang, gfx_high
 
+    # Флаг для отслеживания зажатия пальца/мыши
+    is_dragging = False
+
     while True:
         current_time = pygame.time.get_ticks()
         mx, my = pygame.mouse.get_pos()
@@ -467,6 +467,22 @@ async def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 save_data(); pygame.quit(); sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                is_dragging = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                is_dragging = False
+
+            # Управление кораблем (мышью или пальцем) для мобильных браузеров
+            if event.type == pygame.MOUSEMOTION and is_dragging:
+                if state == "PLAY":
+                    px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
+                    py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
+                    player.center = (px, py)
+                elif state == "PLAY" and tutorial_active and tutorial_step == 0:
+                    px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
+                    py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
+                    player.center = (px, py)
 
             if state == "PLAY" and tutorial_active:
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -482,12 +498,6 @@ async def main():
                         last_enemy_spawn = pygame.time.get_ticks()
                         last_shot_time = pygame.time.get_ticks()
                         save_data()
-                    continue
-                elif event.type == pygame.MOUSEMOTION and event.buttons[0]:
-                    if tutorial_step == 0:
-                        px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                        py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                        player.center = (px, py)
                     continue
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -597,12 +607,6 @@ async def main():
                         px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
                         py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
                         player.center = (px, py)
-
-            if state == "PLAY":
-                if event.type == pygame.MOUSEMOTION and event.buttons[0]:
-                    px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                    py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                    player.center = (px, py)
 
         screen.fill(BLACK)
 
@@ -714,7 +718,6 @@ async def main():
             pygame.draw.rect(screen, BUTTON_HOVER if btn_shop_back.collidepoint((mx, my)) else BUTTON_COLOR, btn_shop_back, border_radius=15)
             draw_text(t("back"), font, WHITE, btn_shop_back.centerx, btn_shop_back.centery)
 
-            # === ОКНО ПОДТВЕРЖДЕНИЯ ПОКУПКИ ===
             if pending_purchase:
                 overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
                 overlay.fill((0, 0, 0, 200))
