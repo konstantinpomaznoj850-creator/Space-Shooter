@@ -424,7 +424,7 @@ def check_achievements():
             achievement_popup = t(a["id"])
             popup_timer = pygame.time.get_ticks()
             play_sound(snd_powerup)
-            save_data()
+            # Не сохраняем здесь, чтобы не фризить браузер
 
 def adjust_timers_after_pause(delta):
     global last_shot_time, last_enemy_spawn, laser_start_time, laser_damage_timer
@@ -456,14 +456,12 @@ async def main():
     global achievement_popup, popup_timer
     global coins, unlocked_ships, equipped_ship, upgrade_levels, lang, gfx_high
 
-    is_dragging = False
-
     while True:
         current_time = pygame.time.get_ticks()
         mx, my = pygame.mouse.get_pos()
 
-        # Плавное движение корабля (если палец/мышь зажат)
-        if state == "PLAY" and is_dragging:
+        # Плавное движение корабля (работает на мобильных и ПК)
+        if state == "PLAY" and pygame.mouse.get_pressed()[0]:
             px = max(player.width//2, min(mx, WIDTH - player.width//2))
             py = max(ZONE_Y + player.height//2, min(my, HEIGHT - player.height//2))
             player.center = (px, py)
@@ -472,26 +470,24 @@ async def main():
             if event.type == pygame.QUIT:
                 save_data(); pygame.quit(); sys.exit()
 
-            # Обработка нажатий (мышь или палец)
+            # Обработка тапов
             if event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
-                is_dragging = True
-                
-                if event.type == pygame.FINGERDOWN:
-                    click_x, click_y = int(event.x * WIDTH), int(event.y * HEIGHT)
-                else:
-                    click_x, click_y = event.pos
-                    
-                # === ОБУЧЕНИЕ ===
+                # Если идет обучение, любой клик пропускает шаг
                 if state == "PLAY" and tutorial_active:
                     tutorial_step += 1
                     tutorial_step_time = pygame.time.get_ticks()
                     if tutorial_step >= 4:
                         tutorial_active = False
                         tutorial_done = True
-                        last_enemy_spawn = pygame.time.get_ticks() - enemy_spawn_delay # Спавним врага сразу
+                        last_enemy_spawn = 0 # Принудительно спавним врага
                         last_shot_time = pygame.time.get_ticks()
-                        save_data()
                     continue # Пропускаем нажатия на кнопки под обучением
+
+                # Получаем координаты клика
+                if event.type == pygame.FINGERDOWN:
+                    click_x, click_y = int(event.x * WIDTH), int(event.y * HEIGHT)
+                else:
+                    click_x, click_y = event.pos
 
                 dist_to_bomb = math.hypot(click_x - bomb_center[0], click_y - bomb_center[1])
 
@@ -596,9 +592,6 @@ async def main():
                                     powerups.append([pygame.Rect(e[0].centerx - 10, e[0].centery, 20, 20), "coin", 1])
                             enemies.clear(); enemy_bullets.clear()
                             if boss: boss["hp"] -= 50
-
-            if event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
-                is_dragging = False
 
         screen.fill(BLACK)
 
@@ -774,9 +767,8 @@ async def main():
                     if tutorial_step >= 4:
                         tutorial_active = False
                         tutorial_done = True
-                        last_enemy_spawn = current_time - enemy_spawn_delay
+                        last_enemy_spawn = 0
                         last_shot_time = current_time
-                        save_data()
 
                 check_achievements()
 
@@ -1205,7 +1197,7 @@ async def main():
             draw_text(t("menu"), font, WHITE, btn_menu_gameover.centerx, btn_menu_gameover.centery)
 
         pygame.display.flip()
-        await asyncio.sleep(1 / 60)
+        await asyncio.sleep(0) # Критически важно для Pygbag
 
 if __name__ == "__main__":
     asyncio.run(main())
