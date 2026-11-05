@@ -456,31 +456,36 @@ async def main():
     global achievement_popup, popup_timer
     global coins, unlocked_ships, equipped_ship, upgrade_levels, lang, gfx_high
 
+    click_handled = False
+
     while True:
         current_time = pygame.time.get_ticks()
         mx, my = pygame.mouse.get_pos()
+        is_pressing = pygame.mouse.get_pressed()[0]
 
-        # Движение корабля (работает на мобильных и ПК)
         if state == "PLAY":
-            if pygame.mouse.get_pressed()[0]:
+            if is_pressing:
                 px = max(player.width//2, min(mx, WIDTH - player.width//2))
                 py = max(ZONE_Y + player.height//2, min(my, HEIGHT - player.height//2))
                 player.center = (px, py)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                save_data(); pygame.quit(); sys.exit()
-
-            if state == "PLAY" and tutorial_active:
-                if event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.FINGERDOWN:
+                
+            if tutorial_active:
+                if is_pressing and not click_handled:
+                    click_handled = True
                     tutorial_step += 1
                     tutorial_step_time = pygame.time.get_ticks()
                     if tutorial_step >= 4:
                         tutorial_active = False
                         tutorial_done = True
-                        last_enemy_spawn = pygame.time.get_ticks()
+                        last_enemy_spawn = pygame.time.get_ticks() - enemy_spawn_delay
                         last_shot_time = pygame.time.get_ticks()
                         save_data()
+                elif not is_pressing:
+                    click_handled = False
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                save_data(); pygame.quit(); sys.exit()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 dist_to_bomb = math.hypot(event.pos[0] - bomb_center[0], event.pos[1] - bomb_center[1])
@@ -761,7 +766,7 @@ async def main():
                     if tutorial_step >= 4:
                         tutorial_active = False
                         tutorial_done = True
-                        last_enemy_spawn = current_time
+                        last_enemy_spawn = current_time - enemy_spawn_delay
                         last_shot_time = current_time
                         save_data()
 
