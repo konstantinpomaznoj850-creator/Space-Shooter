@@ -35,7 +35,6 @@ else:
 
 WIDTH, HEIGHT = screen.get_size()
 MIN_DIM = min(WIDTH, HEIGHT)
-clock = pygame.time.Clock()
 
 # Цвета
 BLACK = (20, 20, 20)
@@ -213,7 +212,7 @@ ACHIEVEMENTS_LIST = [
 ]
 
 if sys.platform == "emscripten":
-    SAVE_FILE = "shooter_save.txt"
+    SAVE_FILE = "/data/shooter_save.txt"
 elif hasattr(sys, 'getandroidapilevel'):
     SAVE_DIR = os.getenv('ANDROID_PRIVATE', os.path.expanduser('~'))
     SAVE_FILE = os.path.join(SAVE_DIR, "shooter_save.txt")
@@ -448,7 +447,7 @@ def adjust_timers_after_pause(delta):
 
 async def main():
     global state, prev_state, shop_tab, settings_prev_state
-    global tutorial_active, tutorial_step, tutorial_step_time
+    global tutorial_active, tutorial_step, tutorial_step_time, tutorial_done
     global pending_purchase
     global player, bullets, enemies, powerups, enemy_bullets, particles, boss, boss_max_hp
     global score, wave, current_kills, bombs, last_shot_time, last_enemy_spawn, pause_time
@@ -457,39 +456,23 @@ async def main():
     global achievement_popup, popup_timer
     global coins, unlocked_ships, equipped_ship, upgrade_levels, lang, gfx_high
 
-    # Флаг для отслеживания зажатия пальца/мыши
-    is_dragging = False
-
     while True:
         current_time = pygame.time.get_ticks()
         mx, my = pygame.mouse.get_pos()
+
+        # Движение корабля (работает на мобильных и ПК)
+        if state == "PLAY":
+            if pygame.mouse.get_pressed()[0]:
+                px = max(player.width//2, min(mx, WIDTH - player.width//2))
+                py = max(ZONE_Y + player.height//2, min(my, HEIGHT - player.height//2))
+                player.center = (px, py)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 save_data(); pygame.quit(); sys.exit()
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                is_dragging = True
-            elif event.type == pygame.MOUSEBUTTONUP:
-                is_dragging = False
-
-            # Управление кораблем (мышью или пальцем) для мобильных браузеров
-            if event.type == pygame.MOUSEMOTION and is_dragging:
-                if state == "PLAY":
-                    px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                    py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                    player.center = (px, py)
-                elif state == "PLAY" and tutorial_active and tutorial_step == 0:
-                    px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                    py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                    player.center = (px, py)
-
             if state == "PLAY" and tutorial_active:
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if tutorial_step == 0:
-                        px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                        py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                        player.center = (px, py)
+                if event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.FINGERDOWN:
                     tutorial_step += 1
                     tutorial_step_time = pygame.time.get_ticks()
                     if tutorial_step >= 4:
@@ -498,7 +481,6 @@ async def main():
                         last_enemy_spawn = pygame.time.get_ticks()
                         last_shot_time = pygame.time.get_ticks()
                         save_data()
-                    continue
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 dist_to_bomb = math.hypot(event.pos[0] - bomb_center[0], event.pos[1] - bomb_center[1])
@@ -591,22 +573,19 @@ async def main():
                         state = "MENU"
 
                 elif state == "PLAY":
-                    if btn_pause.collidepoint(event.pos):
-                        state = "PAUSE"
-                        pause_time = pygame.time.get_ticks()
-                    elif dist_to_bomb < bomb_radius and bombs > 0:
-                        bombs -= 1
-                        play_sound(snd_explode)
-                        for e in enemies:
-                            create_particles(e[0].centerx, e[0].centery, e[3])
-                            if random.randint(1, 100) <= 50:
-                                powerups.append([pygame.Rect(e[0].centerx - 10, e[0].centery, 20, 20), "coin", 1])
-                        enemies.clear(); enemy_bullets.clear()
-                        if boss: boss["hp"] -= 50
-                    else:
-                        px = max(player.width//2, min(event.pos[0], WIDTH - player.width//2))
-                        py = max(ZONE_Y + player.height//2, min(event.pos[1], HEIGHT - player.height//2))
-                        player.center = (px, py)
+                    if not tutorial_active:
+                        if btn_pause.collidepoint(event.pos):
+                            state = "PAUSE"
+                            pause_time = pygame.time.get_ticks()
+                        elif dist_to_bomb < bomb_radius and bombs > 0:
+                            bombs -= 1
+                            play_sound(snd_explode)
+                            for e in enemies:
+                                create_particles(e[0].centerx, e[0].centery, e[3])
+                                if random.randint(1, 100) <= 50:
+                                    powerups.append([pygame.Rect(e[0].centerx - 10, e[0].centery, 20, 20), "coin", 1])
+                            enemies.clear(); enemy_bullets.clear()
+                            if boss: boss["hp"] -= 50
 
         screen.fill(BLACK)
 
@@ -1213,8 +1192,8 @@ async def main():
             draw_text(t("menu"), font, WHITE, btn_menu_gameover.centerx, btn_menu_gameover.centery)
 
         pygame.display.flip()
-        await asyncio.sleep(0)
-        clock.tick(60)
+        # В Pygbag это критически важно для работы без зависаний:
+        await asyncio.sleep(1 / 60)
 
 if __name__ == "__main__":
     asyncio.run(main())
