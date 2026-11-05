@@ -27,12 +27,12 @@ jobs:
           git zip unzip openjdk-17-jdk \
           autoconf automake libtool pkg-config \
           zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
-          cmake libffi-dev libssl-dev ccache
+          cmake libffi-dev libssl-dev ccache libgl1-mesa-dev
 
     - name: Install Buildozer
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --user --upgrade buildozer cython==0.29.34 virtualenv
+        python3 -m pip install --user --upgrade buildozer virtualenv
 
     - name: Cache Buildozer
       uses: actions/cache@v4
