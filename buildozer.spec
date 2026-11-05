@@ -5,10 +5,10 @@ package.domain = org.space
 source.dir = .
 source.include_exts = py,wav
 version = 1.0
-requirements = python3==3.10.12,kivy==2.3.0,pygame-ce
+requirements = python3,kivy,pygame-ce==2.4.1
 orientation = portrait
 fullscreen = 1
-android.api = 33
+android.api = 31
 android.minapi = 24
 android.ndk = 25b
 android.archs = arm64-v8a
